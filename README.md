@@ -20,3 +20,8 @@ The script outputs the following information:
 - VM detection results.
 - System artifact check results.
 - Final verdict on system age and freshness.
+
+## Caveats 
+
+- This script is designed for Windows 11 and relies on PCA logs which is not available in all versions of Windows.
+- This script is not fool-proof do not rely on it
