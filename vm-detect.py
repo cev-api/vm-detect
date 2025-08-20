@@ -9,7 +9,14 @@ import re
 if os.name != "nt":
     print("Windows Only - Obviously"); sys.exit(1)
 
-KEYWORDS = [b"vmware", b"777777", b"virtual machine", b"virtual"]
+KEYWORDS = [
+    b"vmware",
+    b"virtual machine",
+    b"virtual",
+    b"pheonix",
+    b"phoenix",
+    b"phoenix technologies",
+]
 ACPI_TARGETS = [b"APIC", b"BOOT", b"FACP", b"FACS", b"HPET", b"MCFG", b"SRAT", b"WAET", b"XSDT"]
 ACPI_HDR_SIZE = 36
 
@@ -100,11 +107,57 @@ def scan_blob(blob: bytes):
     hits=[]
     if not blob: return hits
     low=blob.lower()
+    # 1) Fixed keyword hits
     for kw in KEYWORDS:
         for off in find_all(low, kw):
             s=max(0,off-32); e=min(len(blob), off+len(kw)+32)
             hits.append({"keyword": kw.decode(), "offset": off,
                          "context": ascii_fixed(blob[s:e])})
+    # 2) Sequential pattern hits
+    #    - Repeated alnum chars length >= 4 (AAAA, 7777, ZZZZZZ)
+    #    - Ascending alnum sequences length >= 4 (ABCD, 0123)
+    try:
+        rep_re = re.compile(rb'([A-Za-z0-9])\1{3,}')
+        for m in rep_re.finditer(blob):
+            off = m.start()
+            s=max(0,off-32); e=min(len(blob), off+len(m.group(0))+32)
+            hits.append({
+                "keyword": f"seq:{ascii_fixed(m.group(0))}",
+                "offset": off,
+                "context": ascii_fixed(blob[s:e])
+            })
+        # Ascending runs
+        b = blob
+        n = len(b)
+        i = 0
+        while i < n-3:
+            c = b[i]
+            if (48 <= c <= 57) or (65 <= c <= 90) or (97 <= c <= 122):
+                j = i
+                while j+1 < n:
+                    a = b[j]
+                    d = b[j+1]
+                    # same category and strictly ascending by 1
+                    if ((48 <= a <= 57 and 48 <= d <= 57) or
+                        (65 <= a <= 90 and 65 <= d <= 90) or
+                        (97 <= a <= 122 and 97 <= d <= 122)) and d == a + 1:
+                        j += 1
+                    else:
+                        break
+                if j - i + 1 >= 4:
+                    off = i
+                    seq = b[i:j+1]
+                    s=max(0,off-32); e=min(n, off+len(seq)+32)
+                    hits.append({
+                        "keyword": f"seq:{ascii_fixed(seq)}",
+                        "offset": off,
+                        "context": ascii_fixed(b[s:e])
+                    })
+                    i = j + 1
+                    continue
+            i += 1
+    except Exception:
+        pass
     return hits
 
 def parse_acpi_header(tbl: bytes):
@@ -706,7 +759,7 @@ def main():
             if len(hdr) < ACPI_HDR_SIZE:
                 print(f"  {name:4s}: present, header too small"); continue
             oemid, oemtid, length, chk_ok, chk_byte = parse_acpi_header(hdr)
-            # keyword hits (OEMID only, as requested throughout)
+            # keyword hits on OEMID
             matches = [kw.decode() for kw in KEYWORDS if kw.decode() in (oemid.lower())]
             mtxt = "none" if not matches else ", ".join(matches)
             line = (f"  {name:4s}: OEMID='{oemid}' OEMTableID='{oemtid}' "
@@ -718,6 +771,15 @@ def main():
                     detections.append(f"ACPI {name} OEMID contains '{kw}'")
             else:
                 print(line)
+
+            # Full-table blob scan for sequences and keywords
+            tbl_hits = scan_blob(hdr)
+            if tbl_hits:
+                for h in tbl_hits[:10]:
+                    CC.red(f"    [ACPI/{name}] @0x{h['offset']:X} '{h['keyword']}'  ctx=\"{h['context']}\"")
+                detections.append(
+                    f"ACPI {name} blob matches: " + ", ".join(sorted({h['keyword'] for h in tbl_hits}))
+                )
 
             if name == "WAET":
                 detections.append("WAET table present (Windows ACPI Emulated Devices; common in VMs)")
