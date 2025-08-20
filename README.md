@@ -20,9 +20,13 @@ VMDetect is a Windows-focused Python utility that detects virtual machine indica
 
 Some software blocks virtual machines to hinder reverse‑engineering, malware analysis, and abuse. Tools like [`VmwareHardenedLoader`](https://github.com/hzqst/VmwareHardenedLoader) try to hide the VM by patching fingerprints so those apps will run anyway. VMDetect exists to expose both the VM and those concealment attempts, and if all else fails will give you a forensic view of the system showing how much it has been used - a soft indicator of a freshly installed VM.
 
-### Anything Better?
+### Comparison to VMAware
 
-Sure, but it won't be Python and it won't be as cool... but if you insist, check out !(VMAware)[https://github.com/kernelwernel/VMAware]
+I honestly had NO idea about this project until I finished my own, but to compare...
+
+![VMAware](https://github.com/kernelwernel/VMAware) is a large, cross-platform C++ library with around a hundred detection techniques, support for Windows, Linux, and macOS, and coverage of over 70 virtualization brands and hypervisors. It’s designed as a broad, flexible framework for VM detection — useful for anti-cheat, research, and security projects that need maximum breadth and configurability across different operating systems and architectures.
+
+VMDetect, by contrast, is Windows-focused, written in Python and is purpose-built. Rather than aiming for maximum coverage, it drills deep into firmware table inspection (ACPI/SMBIOS via GetSystemFirmwareTable) — the exact layer many anti-VM hardeners try to patch. VMDetect is uniquely effective at exposing obfuscated VMware environments (e.g. detecting [`VmwareHardenedLoader`](https://github.com/hzqst/VmwareHardenedLoader)) and complements this with forensic context: install date triangulation, PCA log summaries, and “system cleanliness” checks that highlight suspiciously fresh or scrubbed environments. It is suitable for porting into apps that use Python or can simply used on its own.
 
 ### Windows version support
 
