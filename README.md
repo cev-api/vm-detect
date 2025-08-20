@@ -1,27 +1,75 @@
-# VM Detect
+# VMDetect
 
-![Screenshot](https://i.imgur.com/n91q2wq.png)
+![WithHardenedVMLoader](https://i.imgur.com/1sMPRcR.png)
+![WithoutHardenedVMLoader](https://i.imgur.com/YzRTABn.png)
 
-VM Detect is a Python script designed to detect if a Windows system is running in a virtual machine (VM) and to determine if the system has been recently installed or reset. The script uses various forensic techniques to gather information about the system's installation date and checks for artifacts that might indicate a fresh or scrubbed environment.
+VMDetect is a Windows-focused Python utility that detects virtual machine indicators and assesses whether a system appears freshly installed or recently scrubbed. It performs low-level, read-only firmware table inspection (ACPI/RSMB) via the Windows firmware API, which is the exact surface many anti-VM bypass projects attempt to patch or hide.
 
-## Features
+### Features
 
-- **VM Detection**: Identifies if the system is running in a VM by checking MAC addresses and graphics adapters.
-- **Installation Date Detection**: Uses multiple methods to determine the system's installation date, including registry entries, log files, and WMI queries.
-- **Artifact Checking**: Checks for suspiciously clean system artifacts that might indicate a fresh or scrubbed environment.
+- **Detect Obfuscated VM Environments**: Is able to accurately detect [`VmwareHardenedLoader`](https://github.com/hzqst/VmwareHardenedLoader), an Anti-Anti-VM loader.
+- **Firmware table scanning (core)**: Enumerates and reads ACPI and SMBIOS firmware tables using `EnumSystemFirmwareTables`/`GetSystemFirmwareTable` for both ACPI and RSMB providers. Scans table contents and headers (e.g., OEMID) for virtualized fingerprints and flags presence of WAET.
+- **Registry/driver corroboration**: Falls back to BIOS strings from `HARDWARE\DESCRIPTION\System\BIOS` and inspects driver/services/registry for suspicious entries.
+- **VM detection (vendor-specific)**: Checks for VMware MAC OUI prefixes and DXGI adapter strings indicating VMware.
+- **Soft detections (forensic)**:
+  - Multi-source installation date evidence (Registry, WMI/WMIC, `systeminfo`, setup logs, profile timestamps).
+  - PCA logs summary when available (Windows 10/11; not present on all systems) with suspiciously low-entry highlighting.
+  - System artifact cleanliness (Temp, Prefetch, Recent) to flag unusually clean environments.
 
-## Output
+### Windows version support
 
-The script outputs the following information:
+- Designed to run on Windows 7, 10, and 11.
+- Some detections are version-dependent:
+  - PCA logs often exist on Windows 10/11 and may be absent on Windows 7.
+  - WMIC availability varies (deprecated on newer builds); fallbacks are implemented where possible.
 
-- Forensic install timestamp report.
-- Oldest detected timestamp.
-- System age in days.
-- VM detection results.
-- System artifact check results.
-- Final verdict on system age and freshness.
+### Requirements
 
-## Caveats 
+- Python 3 on Windows
+- Optional (for DXGI adapter check): `comtypes`
 
-- This script is designed for Windows 11 and relies on PCA logs which is not available in all versions of Windows.
-- This script is not fool-proof do not rely on it
+Install optional dependency:
+
+```bash
+pip install comtypes
+```
+
+### Building (PyInstaller)
+
+- Supported build toolchain for broad compatibility (including legacy targets):
+  - PyInstaller v4.x
+  - Python 3.8
+
+Example build command:
+
+```bash
+pyinstaller --onefile vmdetect.py
+```
+
+- Match the target architecture (build 32-bit on a 32-bit Python if you need x86).
+- To bundle additional runtime DLLs, copy them alongside `vmdetect.py` and add with `--add-binary`, or place them next to the built executable.
+
+### Windows XP compatibility notes
+
+This tool can be compiled with PyInstaller v4 using Python 3.8 and run on Windows XP provided the following prerequisites are met. Alternatively, you can bundle the listed runtime DLLs with your PyInstaller build.
+
+- Required OS updates (so the VC++ redist installs and the UCRT loads):
+  - KB2533623
+  - KB4490628 (Servicing Stack)
+  - KB4474419 (SHA-2 support)
+  - KB2999226 (Universal CRT)
+
+- Then install: Microsoft Visual C++ 2015–2022 Redistributable matching your build (x64 or x86).
+
+- Or bundle these with PyInstaller (either via `--add-binary` or by placing them next to the executable):
+  - `ucrtbase.dll`
+  - `vcruntime140.dll`
+  - `vcruntime140_1.dll`
+  - `msvcp140.dll` (and if present on your build box: `msvcp140_1.dll`, `msvcp140_2.dll`)
+  - The `api-ms-win-crt-*.dll` files (UCRT “api-ms-win-crt” stubs)
+
+### Caveats
+
+- Not fool-proof; use results as part of a broader assessment.
+- Some signals (PCA logs, Prefetch) may be disabled by policy or unavailable depending on OS/configuration.
+- Administrative rights are not strictly required, but access to certain artifacts may be limited without elevation.
