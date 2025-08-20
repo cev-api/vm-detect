@@ -20,6 +20,10 @@ VMDetect is a Windows-focused Python utility that detects virtual machine indica
 
 Some software blocks virtual machines to hinder reverse‑engineering, malware analysis, and abuse. Tools like [`VmwareHardenedLoader`](https://github.com/hzqst/VmwareHardenedLoader) try to hide the VM by patching fingerprints so those apps will run anyway. VMDetect exists to expose both the VM and those concealment attempts, and if all else fails will give you a forensic view of the system showing how much it has been used - a soft indicator of a freshly installed VM.
 
+### Anything Better?
+
+Sure, but it won't be Python and it won't be as cool... but if you insist, check out !(VMAware)[https://github.com/kernelwernel/VMAware]
+
 ### Windows version support
 
 - Designed to run on Windows 7, 10, and 11.
