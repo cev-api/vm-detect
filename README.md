@@ -15,6 +15,10 @@ VMDetect is a Windows-focused Python utility that detects virtual machine indica
   - Multi-source installation date evidence (Registry, WMI/WMIC, `systeminfo`, setup logs, profile timestamps).
   - PCA logs summary when available (Windows 10/11; not present on all systems) with suspiciously low-entry highlighting.
   - System artifact cleanliness (Temp, Prefetch, Recent) to flag unusually clean environments.
+ 
+### Why?
+
+Some software blocks virtual machines to hinder reverse‑engineering, malware analysis, and abuse. Tools like [`VmwareHardenedLoader`](https://github.com/hzqst/VmwareHardenedLoader) try to hide the VM by patching fingerprints so those apps will run anyway. VMDetect exists to expose both the VM and those concealment attempts, and if all else fails will give you a forensic view of the system showing how much it has been used - a soft indicator of a freshly installed VM.
 
 ### Windows version support
 
