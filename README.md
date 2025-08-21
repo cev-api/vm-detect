@@ -8,7 +8,7 @@ VMDetect is a Windows-focused Python utility that detects virtual machine indica
 ### Features
 
 - **Detect obfuscated VM environments**: Accurately detects [`VmwareHardenedLoader`](https://github.com/hzqst/VmwareHardenedLoader) and similar anti‑anti‑VM techniques.
-- **ACPI/SMBIOS firmware scanning (core)**:
+- **ACPI/SMBIOS firmware scanning**:
   - Enumerates and reads ALL ACPI tables and SMBIOS via `EnumSystemFirmwareTables`/`GetSystemFirmwareTable` (both ACPI and RSMB providers).
   - Scans OEMID and full table blobs using an expanded keyword list.
   - Sequence detection is limited to ACPI OEMID to reduce noise; WAET presence is flagged.
@@ -20,7 +20,7 @@ VMDetect is a Windows-focused Python utility that detects virtual machine indica
   - PCI Vendor ID scanning via WMIC, PowerShell, and Registry fallbacks.
   - Network OUIs for various VM vendors and DXGI adapter name checks.
 - **Soft detections (forensic)**:
-  - Multi-source installation date evidence (Registry, WMI/WMIC, `systeminfo`, setup logs, profile timestamps).
+  - Multi-source installation date evidence (Registry, WMI/WMIC, systeminfo, setup logs, profile timestamps).
   - PCA logs summary when available (Windows 10/11; not present on all systems) with suspiciously low-entry highlighting.
   - System artifact cleanliness (Temp, Prefetch, Recent) to flag unusually clean environments.
  
