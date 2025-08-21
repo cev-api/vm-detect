@@ -7,10 +7,18 @@ VMDetect is a Windows-focused Python utility that detects virtual machine indica
 
 ### Features
 
-- **Detect Obfuscated VM Environments**: Is able to accurately detect [`VmwareHardenedLoader`](https://github.com/hzqst/VmwareHardenedLoader), an Anti-Anti-VM loader.
-- **Firmware table scanning (core)**: Enumerates and reads ACPI and SMBIOS firmware tables using `EnumSystemFirmwareTables`/`GetSystemFirmwareTable` for both ACPI and RSMB providers. Scans table contents and headers (e.g., OEMID) for virtualized fingerprints and flags presence of WAET.
-- **Registry/driver corroboration**: Falls back to BIOS strings from `HARDWARE\DESCRIPTION\System\BIOS` and inspects driver/services/registry for suspicious entries.
-- **VM detection (vendor-specific)**: Checks for VMware MAC OUI prefixes and DXGI adapter strings indicating VMware.
+- **Detect obfuscated VM environments**: Accurately detects [`VmwareHardenedLoader`](https://github.com/hzqst/VmwareHardenedLoader) and similar anti‑anti‑VM techniques.
+- **ACPI/SMBIOS firmware scanning (core)**:
+  - Enumerates and reads ALL ACPI tables and SMBIOS via `EnumSystemFirmwareTables`/`GetSystemFirmwareTable` (both ACPI and RSMB providers).
+  - Scans OEMID and full table blobs using an expanded keyword list.
+  - Sequence detection is limited to ACPI OEMID to reduce noise; WAET presence is flagged.
+  - Robust fallbacks (ACPI direct probes; SMBIOS via CIM/WMI or BIOS registry snapshot) if enumeration is blocked.
+- **HPET heuristic scoring**: Decodes the ACPI HPET table and scores “VM-likeness” using strict heuristics. Missing HPET is flagged as suspicious. 
+- **Display Adapter “Chip type” scanner (Win7-friendly)**: Reads `HKLM\SYSTEM\CurrentControlSet\Control\Video` to extract chip/adapter strings without relying on WMIC/PowerShell. Flags keyword or sequence hits (prints details only on hit).
+- **Registry/driver corroboration**: BIOS strings fallback; driver/services enumeration and path sanity checks.
+- **Vendor-specific indicators**:
+  - PCI Vendor ID scanning via WMIC, PowerShell, and Registry fallbacks.
+  - Network OUIs for various VM vendors and DXGI adapter name checks.
 - **Soft detections (forensic)**:
   - Multi-source installation date evidence (Registry, WMI/WMIC, `systeminfo`, setup logs, profile timestamps).
   - PCA logs summary when available (Windows 10/11; not present on all systems) with suspiciously low-entry highlighting.
