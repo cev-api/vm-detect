@@ -100,6 +100,19 @@ def ps_base64(cmd: str) -> bytes:
     except Exception:
         return b""
 
+def ps_text(cmd: str) -> str:
+    exe = shutil.which("powershell.exe") or shutil.which("pwsh")
+    if not exe:
+        return ""
+    try:
+        out = subprocess.check_output(
+            [exe, "-NoProfile", "-NonInteractive", "-Command", cmd],
+            stderr=subprocess.DEVNULL, text=True, encoding="utf-8", errors="ignore"
+        )
+        return out or ""
+    except Exception:
+        return ""
+
 def smbios_via_cim() -> bytes:
     # Correct namespace: root\WMI
     cmd = (
@@ -682,7 +695,7 @@ def _get_mac_addresses():
     return macs
 
 def _vmware_oui_matches(macs):
-    vm_ouis = {"00:05:69", "00:0C:29", "00:1C:14", "00:50:56"}
+    vm_ouis = {"00:05:69", "00:0C:29", "00:1C:14", "00:50:56", "00:15:5D", "08:00:27", "00:1C:42", "00:16:3E", "52:54:00"}
     matches = []
     for mac in macs:
         m = mac.strip().upper().replace("-", ":")
@@ -1012,11 +1025,11 @@ def main():
             print(f"  Flags                  : 0x{t['FlagsNum']:02X}")
             score, label, reasons = _hpet_classify(_hpet_info)
             if label == "Likely VM":
-                CC.red(f"  VM-Likelihood: {label} (score={score})")
+                CC.red(f"\n  VM-Likelihood: {label} (score={score})")
             elif label == "Unclear":
-                CC.yellow(f"  VM-Likelihood: {label} (score={score})")
+                CC.yellow(f"\n  VM-Likelihood: {label} (score={score})")
             else:
-                CC.green(f"  VM-Likelihood: {label} (score={score})")
+                CC.green(f"\n  VM-Likelihood: {label} (score={score})")
             for r in reasons:
                 print(f"    - {r}")
             # Only add to detections if not clearly bare metal
@@ -1295,15 +1308,119 @@ def main():
     else:
         print("  Typical artifact volume present")
 
-    # VMWARE-SPECIFIC
-    print("\n[VMWARE] Vendor-specific Indicators")
+    # VENDOR-SPECIFIC INDICATORS
+    print("\n[SOFT] Vendor-specific Indicators - PCI ID's & OUIs")
+    # 1) PCI Vendor IDs via WMIC/PowerShell/Registry fallbacks
+    vendor_hits = []
+    vendor_map = {
+        "15ad": "VMware",
+        "1414": "Microsoft Hyper-V",
+        "80ee": "VirtualBox",
+        "1af4": "QEMU/virtio",
+        "1b36": "Red Hat (QEMU)",
+        "5853": "Xen/XenSource",
+        "1ab8": "Parallels",
+        "1234": "Bochs/QEMU std VGA",
+    }
+
+    # WMIC path (legacy but present on many Win7/10)
+    try:
+        exe = shutil.which("wmic")
+        if exe:
+            out = _run([exe, "path", "Win32_PnPEntity", "get", "PNPDeviceID,Name", "/format:csv"])
+            for line in out.splitlines():
+                L = line.strip()
+                if not L or "," not in L:
+                    continue
+                # CSV: Node,Name,PNPDeviceID (order can vary; use contains)
+                parts = [p.strip() for p in L.split(",")]
+                if len(parts) < 3:
+                    continue
+                name = parts[-2]
+                pnp  = parts[-1]
+                if "PCI\\VEN_" in pnp.upper():
+                    m = re.search(r"VEN_([0-9A-Fa-f]{4})", pnp)
+                    if m:
+                        ven = m.group(1).lower()
+                        if ven in vendor_map:
+                            vendor_hits.append((vendor_map[ven], ven, name))
+    except Exception:
+        pass
+
+    # PowerShell fallback (no admin needed)
+    if not vendor_hits:
+        ps = (
+            "Get-PnpDevice -ErrorAction SilentlyContinue | "
+            "ForEach-Object { $_.InstanceId + '|' + $_.FriendlyName }"
+        )
+        txt = ps_text(ps)
+        if txt:
+            for line in txt.splitlines():
+                if "|" not in line:
+                    continue
+                inst, name = line.split("|", 1)
+                up = inst.upper()
+                if "PCI\\VEN_" in up:
+                    m = re.search(r"VEN_([0-9A-Fa-f]{4})", up)
+                    if m:
+                        ven = m.group(1).lower()
+                        if ven in vendor_map:
+                            vendor_hits.append((vendor_map[ven], ven.lower(), name.strip()))
+
+    # Registry fallback
+    if not vendor_hits:
+        try:
+            import winreg
+            base = r"SYSTEM\CurrentControlSet\Enum\PCI"
+            root = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, base)
+            i = 0
+            while True:
+                try:
+                    sub = winreg.EnumKey(root, i); i += 1
+                except OSError:
+                    break
+                m = re.search(r"VEN_([0-9A-Fa-f]{4})", sub)
+                if not m:
+                    continue
+                ven = m.group(1).lower()
+                if ven not in vendor_map:
+                    continue
+                try:
+                    k = winreg.OpenKey(root, sub)
+                except OSError:
+                    continue
+                j = 0
+                while True:
+                    try:
+                        inst = winreg.EnumKey(k, j); j += 1
+                    except OSError:
+                        break
+                    try:
+                        kk = winreg.OpenKey(k, inst)
+                        name, _ = winreg.QueryValueEx(kk, "FriendlyName")
+                    except Exception:
+                        name = sub
+                    vendor_hits.append((vendor_map[ven], ven, str(name)))
+                winreg.CloseKey(k)
+            winreg.CloseKey(root)
+        except Exception:
+            pass
+
+    if vendor_hits:
+        for vendor, ven, name in vendor_hits:
+            CC.red(f"  PCI Vendor: {vendor} (VEN_{ven.upper()}) -> {name}")
+            detections.append(f"PCI vendor indicates {vendor}: VEN_{ven.upper()} ({name})")
+    else:
+        print("  No VM PCI vendor IDs detected from available sources")
+
+    # 2) VMware-specific MAC OUIs and DXGI check
     macs = _get_mac_addresses()
     mac_hits = _vmware_oui_matches(macs)
     if mac_hits:
         for m in mac_hits:
-            CC.red(f"  VMware OUI MAC detected: {m}")
+            CC.red(f"  VM OUI MAC detected: {m}")
     else:
-        print("  No VMware MAC OUIs detected")
+        print("  No VM MAC OUIs detected")
     dxgi_hit, dxgi_name = _check_dxgi_adapter_vmware()
     if dxgi_hit:
         CC.red(f"  DXGI Adapter indicates VMware: {dxgi_name}")
