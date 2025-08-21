@@ -66,10 +66,10 @@ pyinstaller --onefile vmdetect.py
 This tool can be compiled with PyInstaller v4 using Python 3.8 and run on Windows XP provided the following prerequisites are met. Alternatively, you can bundle the listed runtime DLLs with your PyInstaller build.
 
 - Required OS updates (so the VC++ redist installs and the UCRT loads):
-  - KB2533623
-  - KB4490628 (Servicing Stack)
-  - KB4474419 (SHA-2 support)
-  - KB2999226 (Universal CRT)
+  - ![KB2533623](https://web.archive.org/web/20200803205235id_/https://download.microsoft.com/download/F/1/0/F106E158-89A1-41E3-A9B5-32FEB2A99A0B/Windows6.1-KB2533623-x64.msu)
+  - ![KB4490628](https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2019/03/windows6.1-kb4490628-x64_d3de52d6987f7c8bdc2c015dca69eac96047c76e.msu) (Servicing Stack)
+  - ![KB4474419](https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2019/09/windows6.1-kb4474419-v3-x64_b5614c6cea5cb4e198717789633dca16308ef79c.msu) (SHA-2 support)
+  - ![KB2999226](https://download.microsoft.com/download/1/1/5/11565a9a-ea09-4f0a-a57e-520d5d138140/Windows6.1-KB2999226-x64.msu) (Universal CRT)
 
 - Then install: Microsoft Visual C++ 2015–2022 Redistributable matching your build (x64 or x86).
 
